@@ -1,0 +1,59 @@
+version: "3.9"
+
+services:
+  # MongoDB service
+  mongo:
+    image: mongo:6
+    restart: always
+    volumes:
+      - mongo_data:/data/db
+
+  # Backend API (Python/Flask)
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    environment:
+      - MONGO_URI=mongodb://mongo:27017/bank_app
+      - SECRET_KEY=supersecretkey
+    depends_on:
+      - mongo
+    # Only expose internally for NGINX
+    expose:
+      - "5000"
+
+  # Transactions microservice (JavaScript)
+  transactions:
+    build: ./transactions
+    environment:
+      - MONGO_URI=mongodb://mongo:27017
+      - PORT=3000
+    depends_on:
+      - mongo
+    # Only expose internally for NGINX
+    expose:
+      - "3000"
+
+  # Frontend static site
+  studentportfolio:
+    build: ./studentportfolio
+    depends_on:
+      - backend
+    # Only expose internally for NGINX
+    expose:
+      - "80"
+
+  # NGINX reverse proxy
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - backend
+      - transactions
+      - studentportfolio
+
+volumes:
+  mongo_data:
